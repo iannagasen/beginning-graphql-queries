@@ -2,7 +2,7 @@
 
 ### 1. Create the schema for this mini project
 
-#### 2. Under graphql, create `queries.graphqls`
+### 2. Under graphql, create `queries.graphqls`
 
 ```graphql
 type Query {
@@ -190,10 +190,10 @@ query {
 4. **`account()`**
 
 ```java
-	@SchemaMapping(typeName = "Customer")
-	Account account(Customer customer) {
-		return new Account(customer.id());
-	}
+@SchemaMapping(typeName = "Customer")
+Account account(Customer customer) {
+  return new Account(customer.id());
+}
 ```
 
 Now we use the `@SchemaMapping` annotation since the root(or source) of this operation will be from `Customer` a user defined Entity
@@ -210,14 +210,14 @@ This is because when we query this, we will not supply an argument on the accoun
 
 Q: Then, where will it get the Customer object?
 
-A: It will get the customer object from its source which is type Customer. Now think of this @Embeddable in Hibernate, where we try to embed another table to table. This is like Joining 2 tables together
+A: It will get the customer object from its source which is type Customer. Now think of this as similar to @Embeddable in Hibernate, where we try to embed another columns to the source column or table. This is like Joining 2 tables together
 
 ```java
-..
+...
 @SchemaMapping(typeName = "Customer")
 // No @Argument annotation, why?
 Account account(Customer customer) {
-  ...
+...
 }
 ```
 
@@ -258,4 +258,69 @@ Sample Output:
     ]
   }
 }
+```
+
+---
+
+---
+
+---
+
+## **The N+1 Problem**
+
+```java
+@SchemaMapping(typeName = "Customer")
+Account account(Customer customer) {
+  System.out.println("Getting account for customer # " + customer.id());
+  return new Account(customer.id());
+}
+```
+
+The problem with this code is when you query customers. It will execute the method 1 by 1 for every customer.
+
+Query:
+
+```graphql
+query {
+  customers {
+    id
+    name
+    account {
+      id
+    }
+  }
+}
+```
+
+Logs:
+
+```cmd
+Getting account for customer # 1
+Getting account for customer # 2
+```
+
+Suppose to be a single query. It technically becomes 3, the original (1) query plus 2 (n), the size of the customers. This is known as the n+1 customers. What if there is a network or database call dependency in the code? then it will be cause of speed issue
+
+### **Solution:**
+
+### Use the **`@BatchMapping`** annotation
+
+```java
+// with these, we are mapping the customers by 1 batch and process it.
+@BatchMapping
+Map<Customer, Account> account(List<Customer> customers) {
+  System.out.println("account() was called");
+
+  return customers.stream()
+    .collect(Collectors.toMap(
+      customer -> customer,
+      customer -> new Account(customer.id())
+    ));
+}
+```
+
+**Note** that this will follow a following method signature to make it work
+
+```java
+Map<ParentType, Type> fieldName(List<ParentType> x)
 ```
